@@ -8,11 +8,11 @@ __pycache__/
 
 # Data
 *.csv
-data
+data/*
 .DS_Store
 
-*.pdf
-*.html
+557/**.pdf
+557/**.html
 
 # Distribution / packaging
 .Python
