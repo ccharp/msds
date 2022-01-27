@@ -12,6 +12,7 @@ data
 .DS_Store
 
 *.pdf
+*.html
 
 # Distribution / packaging
 .Python
