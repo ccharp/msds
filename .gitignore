@@ -11,8 +11,8 @@ __pycache__/
 data/*
 .DS_Store
 
-557/**.pdf
-557/**.html
+557/**/*.pdf
+557/**/*.html
 
 # Distribution / packaging
 .Python
