@@ -7,6 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
 ```
 
 ## Question 1
@@ -19,29 +21,125 @@ knitr::opts_chunk$set(echo = TRUE)
 ### temp: Temperature
 ### output: Process output
  
+```{r echo=TRUE,include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+temps <- as_tibble(read.csv("../data/temperature_experiment.csv"))
+
+temps
+```
+
 ### 1.1. Perform the large-sample Z-test to compare mean output for the two temperatures. Give the value of the test statistic and the p-value for the test.
+```{r}
+t60 <- (temps %>% filter(temp==60))$output
+t75 <- (temps %>% filter(temp==75))$output
+
+diff.means = mean(t60) - mean(t75)
+var.t60 = var(t60)/length(t60)
+var.t75 = var(t75)/length(t75)
+my.se = sqrt(var.t60 + var.t75)
+
+zstat = diff.means/my.se
+pp("Test statistic: ", zstat)
+
+p.value <- 1 - pnorm(zstat)
+pp("P-value: ", 1 - p.value)
+```
 
 ### 1.2. Do you reject the null hypothesis at a significance level of 0.05?
+```{r}
+qnorm(0.05)
+```
+
+Yes! The P-value is sufficiently low and -2.55 is less than -1.6. 
 
 ### 1.3. State the null hypothesis for the test.
+\begin{align*}
+&H_0: \mu_{60} - \mu_{75} = 0\\
+&H_1: \mu_{60} - \mu_{75} < 0 
+\end{align*}
+
+Since we want to know if using a higher temperature increases output, i.e. that the mean of the higher temperature sample is higher than the mean of the lower temperature sample, we hypothesize that the difference between $\mu_{60}$ and $\mu_{75}$ is less than $0$
 
 ### 1.4. Perform the unequal-variance (Welch) t-test to compare mean output in the two temperature groups. Report the test statistic and the p-value for the test.
+```{r}
+ttest.unequal <- t.test(x=t60, y=t75, alternative='less', var.equal=FALSE)
+
+pp("Test statistic: ", ttest.unequal$statistic)
+pp("P-value: ", ttest.unequal$p.value)
+```
 
 ### 1.5. Perform the equal-variance t-test to compare mean output in the two temperature groups. Report the test statistic and the p-value for the test.
+```{r}
 
-### 1.6. Which of the three tests do you think is most valid for this experiment? Why? 
+ttest.equal <- t.test(x=t60, y=t75, alternative='less', var.equal=TRUE)
+
+pp("Test statistic: ", ttest.equal$statistic)
+pp("P-value: ", ttest.equal$p.value)
+```
+
+### 1.6. Which of the three tests do you think is most valid for this experiment? Why?
+```{r}
+pp("Variance for 60C output: ", var.t60)
+pp("Variance for 75C output: ", var.t75)
+```
+
+```{r echo=FALSE}
+ggplot((temps %>% filter(temp==60)), aes(x=output)) + geom_histogram(bins=20) + ggtitle("60 degree distribution")
+ggplot((temps %>% filter(temp==75)), aes(x=output)) + geom_histogram(bins=20) + ggtitle("75 degree distribution")
+```
+Since the sample sizes are relatively small (and more importantly, we don't have a test that indicates whether the sample size is large enough) and variances are quite different equal, the Welch t-test is most appropriate. Additionally, the data is plausibly normal given the above histograms, though it's hard to tell with such a small sample. 
 
 ### 1.7. Calculate a 95% confidence interval for the difference between mean output using the large-sample method.
+```{r}
+calc.conf <- function(diff.mean, statistic, se) {
+    bound <- statistic*se
+    list(lower.bound = diff.mean - bound, upper.bound = diff.mean + bound)
+}
+
+interval <- calc.conf(diff.means, 1.96, my.se)
+pp("Confidence interval: (" , interval$lower.bound, ", ", interval$upper.bound, ")")
+```
+
+Since $H_0$ claims that there is no difference between the means, we may again reject it, since $0$ lies outside of the 95% confidence interval.
 
 ### 1.8. Calculate a 95% confidence interval for the difference between mean output using a method that corresponds to the Welch test.
+```{r}
+st <- qt(0.975, df=ttest.unequal$parameter)
+interval <- calc.conf(diff.means, st, my.se)
+pp("Confidence interval: (" , interval$lower.bound, ", ", interval$upper.bound, ")")
+```
+Since $H_0$ claims that there is no difference between the means, we may again reject it, since $0$ lies outside of the 95% confidence interval.
 
 ### 1.9. Calculate a 95% confidence interval for the difference between mean output using a method that corresponds to the equal-variance t-test.
+```{r}
+n60 <- length(t60)
+n75 <- length(t75)
+pooled.var = ((n60 - 1)*var(t60) + (n75 - 1)*var(t75))/(n60 + n75 - 2)
+pooled.se = sqrt(pooled.var/(n60 + n75))
+st <- qt(0.975, df=ttest.equal$parameter)
+interval <- calc.conf(diff.means, st, pooled.se)
+pp("Confidence interval: (" , interval$lower.bound, ", ", interval$upper.bound, ")")
+```
+Since $H_0$ claims that there is no difference between the means, we may again reject it, since $0$ lies outside of the 95% confidence interval.
 
 ### 1.10. Apart from any effect on the mean output, do the results of the experiment suggest a disadvantage of the higher temperature?
+
+Production runs with the higher temperature, while more productive on average, also had much higher variability. This could make it difficult to coordinate with downstream stakeholders/processes that rely on consistent output from this step in the short-term.
 
 ## Question 2
 
 ### Data set: ‘defects.csv’
+
+```{r echo=FALSE} 
+defects <- as_tibble(read.csv("../data/defects.csv"))
+
+defects 
+```
 
 ### The data are from an experiment to compare 4 processing methods for manufacturing steel ball bearings. The 4 process methods were run for one day and a random sample of 1% of the ball bearings from the day was taken from each of the 4 methods. Because the processes produce ball bearings at different rates the sample sizes were not the same for the 4 methods. Each sampled ball bearing had its weight measured to the nearest 0.1 g and the number of surface defects was counted. The variables in the data set are:
 
@@ -52,18 +150,74 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### 2.1. The target weight for the ball bearings is 10 g. For each of the 4 methods it is desired to test the null hypothesis that the mean weight is equal to 10. What test should be used?
 
+```{r}
+defects %>%
+    group_by(Method) %>%
+    summarize(Count = n())
+```
+
+Two sided t test. The sample size is large enough that the t test and z test are very close. 
+
+
 ### 2.2. Give the p-values for the tests for each method. Include your R code for this question.
+```{r}
+defectsA <- defects %>% filter(Method=='A')
+defectsB <- defects %>% filter(Method=='B')
+defectsC <- defects %>% filter(Method=='C')
+defectsD <- defects %>% filter(Method=='D')
+
+pA <- t.test(defectsA$Weight, mu=10)$p.value
+pB <- t.test(defectsB$Weight, mu=10)$p.value
+pC <- t.test(defectsC$Weight, mu=10)$p.value
+pD <- t.test(defectsD$Weight, mu=10)$p.value
+
+# reject = data.frame(pvalues < 0.05, any.rejection=apply(pvalues<0.05, 1, any))
+#apply(reject,2,mean)
+
+data_frame(pA, pB, pC, pD)
+```
+The p-value for A, B, and C indicates that we would not reject the null hypothesis, i.e. there is not sufficient evidence that the true mean weight differs from 10g. However, the mean weight of D does appear likely to differ from 10g. The conclusion for the entire set of bearings is unclear (slide 19, lecture 5).
+
 
 ### 2.3. Apply a Bonferroni correction to your results from the previous question to account for inflation of type I error rate due to multiple testing. How does the Bonferroni correction change your conclusions? In particular, do you have evidence to reject the null hypothesis that the mean weight for all 4 methods is equal to 10, at significance level 0.05?
 
-### 2.4. It is is desired to compare mean weights of the 4 methods. This is to be done first by performing pairwise comparisons of mean weight for the different methods. What test should be used for these comparisons?
+```{r}
+bon.correction <- 0.5 / 4
+pp("Bonferroni Corrected significance: ", bon.correction)
+```
+This does change the conclusion in that we are more confident that the null hypothesis is not reject: each p-value is greater than the corrected significance (0.125). 
+
+### 2.4. It is desired to compare mean weights of the 4 methods. This is to be done first by performing pairwise comparisons of mean weight for the different methods. What test should be used for these comparisons?
+The most conservative approach, since we don't know the true variances of of each method, is the Welch T-test. We'll use that.
 
 ### 2.5. Report the p-values from all pairwise comparisons. Include your R code for this question.
+```{r}
+pAB <- t.test(defectsA$Weight, defectsB$Weight, var.equal=F)$p.value
+pAC <- t.test(defectsA$Weight, defectsC$Weight, var.equal=F)$p.value
+pAD <- t.test(defectsA$Weight, defectsD$Weight, var.equal=F)$p.value
+pBC <- t.test(defectsB$Weight, defectsC$Weight, var.equal=F)$p.value
+pBD <- t.test(defectsB$Weight, defectsD$Weight, var.equal=F)$p.value
+pCD <- t.test(defectsC$Weight, defectsD$Weight, var.equal=F)$p.value
+
+data_frame(pAB, pAC, pAD, pBC, pBD, pCD)
+```
 
 ### 2.6. Apply a Bonferroni correction to your results of the previous question to account for inflation of type I error rate due to multiple testing. What conclusion would you draw from these results? Would you reject the null hypothesis of no difference between any pair of means among the 4 methods, at significance level 0.05?
+```{r}
+bon.correction <- 0.5 / 6
+pp("Bonferroni Corrected significance: ", bon.correction)
+```
+It's unclear. The results are ambiguous. The means of AD and BD differ significantly, even after applying the Bonferroni significance correction, but the other differences of means are not significant. If I had to choose one, I'd say we do not reject the null hypothesis. 
 
 ### 2.7. Compare the mean weights for the 4 methods using ANOVA. State the F-statistic and the p-value for the F-test. Include your R code for this question.
+```{r}
+summary(aov(Weight ~ Method, data=defects))
+```
 
 ### 2.8. What do you conclude from the ANOVA?
+Here, I am tempted to reject the null hypothesis, depending on how we round. However, since 0.0515 is greater than our significance threshold by 0.0015, we do not reject the null hypothesis. 
+
+Question for grader: how should I account for significant figures with respect to p-value? 
 
 ### 2.9. How does your conclusion from ANOVA compare to the conclusion from the pairwise comparisons?
+The conclusion for ANOVA is much less ambiguous, though we failed to reject the null hypothesis in both cases. We have a single significance value instead of the six pairwise values.
