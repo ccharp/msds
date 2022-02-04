@@ -11,6 +11,9 @@ __pycache__/
 data/*
 .DS_Store
 
+.RData
+.RHistory
+
 557/**/*.pdf
 557/**/*.html
 
