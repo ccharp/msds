@@ -1,0 +1,143 @@
+---
+title: "Homework III"
+author: "Corbin Charpentier"
+date: "2/8/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+```
+
+```{r include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+lead_df <- read_csv("../data/lead_study.csv")
+
+lead_df
+```
+### Data: ‘lead.csv’
+
+### The data are from a study of the association between exposure to lead and IQ. The study was conducted in an urban area around a lead smelter. A random sample of 124 children who lived in the area was selected. Each study participant had a blood sample drawn in both 1972 and 1973 to assess blood concentrations of lead. The children were grouped based on their blood concentrations as follows:
+
+### Group 1: concentration < 40 mg/L in both 1972 and 1973
+### Group 2: concentration > 40 mg/L in both 1972 and 1973 or > 40 mg/L in 1973 alone (3 participants)
+### Group 3: concentration > 40 mg/L in 1972 but < 40 mg/L in 1973
+
+### Each participant completed an IQ test in 1973. (A subset of the IQ scores from this study were used in HW 1, Question 3.) The variables in the data set are listed below.
+
+### ID: Participant identification number
+### SEX: Participant sex (1=M or 2=F)
+### GROUP: As described above (1, 2, or 3)
+### IQ: IQ score
+
+### 1. The first goal is to compare the mean IQ scores for males and females. Use a 2-sample t-test for this comparison. What is the p-value?
+```{R}
+males <- lead_df %>% filter(SEX==1)
+females <- lead_df %>% filter(SEX==2)
+
+pp("Num males: ", length(males$IQ))
+pp("Num females: ", length(females$IQ))
+
+t_results <- t.test(males$IQ, females$IQ, var.equal=T)
+pp("P-value: ", t_results$p.value)
+```
+The p-value is quite high. I use assume equal IQ variance between male and female populations based on prior domain knowledge.
+
+### 2. State the conclusion from your test.
+I do not reject the null hypothesis that there is no difference between the mean IQs of male and female populations.
+
+### 3. Are the independence assumptions valid for the t-test in this situation? Give a brief explanation.
+It seems likely that they are independent. I can't immediately think of a way a male's IQ would effect a female's or vice versa, thought it is possible that the locations with high lead contamination are associated with a specific range of IQs. According the the prompt, the children were randomly chosen. This isn't to say no bias was captured.
+
+### 4. The second goal is to compare the mean IQ scores in the 3 groups. State in words the null hypothesis for this test.
+Null hypothesis: there is significant no difference between the means of each of the three groups. In other words, led concentration, at the level tested in the experiment, does not affect IQ of children. 
+
+### 5. State in words the alternative hypothesis for this test.
+Alternative hypothesis: There is a significant different in the mean IQs of at least one of the three groups. In other words, In other words, led concentration, at the level tested in the experiment, has some effect on the IQ of children. 
+
+### 6. What method should be used to perform the test?
+ANOVA. We assume the population variance is identical for all groups. 
+
+### 7. Perform the test. Report the p-value.
+```{r}
+summary(aov(IQ ~ factor(GROUP), data=lead_df))
+```
+
+### 8. State your conclusion about the evidence for an association between lead exposure and IQ.
+Since there is a very low probability (p-value 0.0242) of the differences being as extreme as they were, we reject the null hypothesis. 
+
+### 9. Are there strong reasons to believe that the assumptions of this test are not met? Briefly justify your answer.
+* Each group is independent. 
+* We don't have any reason to believe the variances are different under the null hypothesis. This assumption was stated above. 
+* It is known that IQ is normally distributed across humanity.
+
+### 10. Conduct all pairwise comparison of group means. Report the p-values.
+```{r}
+g1 <- lead_df %>% filter(GROUP==1)
+g2 <- lead_df %>% filter(GROUP==2)
+g3 <- lead_df %>% filter(GROUP==3)
+g2AndG3 <- g2 %>% bind_rows(g3)
+
+t.test(g1$IQ, g2$IQ, var.equal=T)
+t.test(g1$IQ, g3$IQ, var.equal=T)
+t.test(g2$IQ, g3$IQ, var.equal=T)
+
+# Test and amended null hypothesis: no difference between no-lead and lead-at-some-point
+t.test(g1$IQ, g2AndG3$IQ, var.equal=T)
+```
+Just for fun, I tried testing g1 against combined groups g1 and g2.
+
+### 11. What conclusion about the association between lead and IQ would you draw from the pairwise comparisons of group means? Does it agree with the conclusion in Q8? (Consider the issue of multiple testing in your answer.)
+Applying the Bonferroni correction, we require a p-value less than 0.0166 to reject the null hypothesis, so we do not reject the null hypothesis. This does not agree with my conclusion in Q8.
+
+However, if the null hypothesis were "there is no significant difference between children who never had elevated lead concentration and those that did", we'd reject it. 
+
+
+### 12. Now we wish to compare the 3 group means for males and females separately. Display some appropriate descriptive statistics for this analysis.
+```{R}
+lead_df %>% group_by(SEX, GROUP) %>% count
+lead_df %>% 
+    group_by(SEX, GROUP) %>% 
+    summarise(mean = mean(IQ), variance = var(IQ))
+```
+Variance is relatively low for females with high lead concentration, a lot lower than the variance of males. 
+
+### 13. Perform tests to compare the mean IQ scores in the 3 groups for males and females separately. Report the p-values from the two tests.
+```{R}
+summary(aov(IQ ~ factor(GROUP), data=filter(lead_df, SEX==1)))
+summary(aov(IQ ~ factor(GROUP), data=filter(lead_df, SEX==2)))
+```
+This is quite interesting. We observe the respective p-values and reject the null hypothesis for the female group but not the male group. 
+
+### 14. What can you conclude about the association between lead and IQ from these tests? Does it agree with the result in Q8 and Q11? (Consider multiple testing.)
+For clarity, I am testing two separate null hypotheses here: that there is no effect for neither male nor female grouping, respectively.
+We can confidently reject the null hypothesis for the female group. We do not reject the null hypothesis for males. This partially agrees with the results from both questions 8 and 11.
+
+### 15. Now perform all 3 pairwise comparisons of groups for males and females separately. Report the p-values from these tests?
+```{R}
+g1f = filter(g1, SEX==1)
+g2f = filter(g2, SEX==1)
+g3f = filter(g3, SEX==1)
+g1m = filter(g1, SEX==2)
+g2m = filter(g2, SEX==2)
+g3m = filter(g3, SEX==2)
+
+pp("P-value for Female G1 and G2: ", t.test(g1f$IQ, g2f$IQ, var.equal=T)$p.value)
+pp("P-value for Female G1 and G3: ", t.test(g1f$IQ, g3f$IQ, var.equal=T)$p.value)
+pp("P-value for Female G2 and G3: ", t.test(g2f$IQ, g3f$IQ, var.equal=T)$p.value)
+pp("P-value for Male G1 and G2: ", t.test(g1m$IQ, g2m$IQ, var.equal=T)$p.value)
+pp("P-value for Male G1 and G3: ", t.test(g1m$IQ, g3m$IQ, var.equal=T)$p.value)
+pp("P-value for Male G2 and G3: ", t.test(g2m$IQ, g3m$IQ, var.equal=T)$p.value)
+
+pp("Bonferroni corrected significance: ", 0.05/6)
+```
+
+### 16. What do you conclude about the association between lead and IQ from the results in Q13? Does your conclusion change from previous conclusions made in Q8, Q11 and Q14?  
+With Bonferroni correction, we cannot reject the null hypothesis. 
