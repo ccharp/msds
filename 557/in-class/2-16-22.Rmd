@@ -1,0 +1,65 @@
+---
+title: "2-16-22-in-class"
+author: "Corbin Charpentier"
+date: "2/16/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE}
+library(tidyverse)
+
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+fevs <- as_tibble(read.csv("../data/fev.csv"))
+
+length(unique(fevs$age))
+```
+
+Question 1. 
+
+1.1. Fit a linear regression model with fev as response and the smoke indicator as predictor. Assess the assumptions of linearity, constant variance and normality using residual plots.
+```{R}
+plot(lm(fev ~ factor(smoke), data=fevs))
+
+
+```
+
+1.2. Linearity?
+
+1.3. Constant variance?
+
+1.4. Normality?
+
+1.5. What is your overall conclusion about validity of the results from the linear regression model?
+
+1.6. Add age as a predictor variable to the model and create the residual plots for this model. How do they compare with the residual plots from the first model?
+```{R}
+plot(lm(fev ~ factor(smoke) + age, data=fevs))
+```
+
+Question 2.
+
+Data: ‘field_goals_sample.csv’      
+
+The data are from a random sample of 100 field goal attempts in National Football League games from 2008.
+
+The variables to be used for this exercise are:
+
+distance: distance from ball placement to goal posts (yards)
+GOOD: indicator of whether the attempt was successful
+
+2.1. Compare the proportions of field goals that are successful for attempts at distance 40 yards or less versus more than 40 yards using the large-sample Z-test with significance level 0.05. Report the p-value from the test.
+
+2.2. Perform the test using the chi-square test with and without continuity correction.
+
+2.3. Perform the test using Fisher’s exact test.
+
+2.4. How do the results of the different tests compare?

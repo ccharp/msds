@@ -1,0 +1,146 @@
+---
+title: "Homwork IV"
+author: "Corbin Charpentier"
+date: "2/17/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r} 
+# TODO include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+library(tidyverse)
+sales <- read_csv("../data/sales.csv")
+
+sales
+```
+
+## Data Cleaning
+```{R}
+pp("DF Length (before dropping nulls): ", length(sales$LAST_SALE_PRICE))
+
+sales <- sales %>% na.omit()
+
+pp("DF Length (after dropping nulls): ", length(sales$LAST_SALE_PRICE))
+```
+Note: even after dropping incomplete rows, we still have plentry of data to to worth with.
+
+### The data consist of sales prices for a sample of homes from a US city and some features of the houses.
+
+### Variables:
+
+### LAST_SALE_PRICE: the sale price of the home
+### SQFT: area of the house (sq. ft.)
+### LOT_SIZE: area of the lot (sq. ft.)
+### BEDS: number of bedrooms
+### BATHS: number of bathrooms
+
+### 1. Calculate all pairwise correlations between all five variables. 
+```{R}
+cor(sales, method="pearson")
+```
+
+### 2. Make a  scatterplot of the sale price versus the area of the house. Describe the association between these two variables.
+```{R}
+library(ggplot2)
+sales %>% ggplot(aes(x=SQFT, y=LAST_SALE_PRICE)) + geom_point(shape = 3)
+```
+There appears to be a linear relationship between the two with some outliers at higher values of X
+
+### 3. Fit a simple linear regression model (Model 1) with sale price as response variable and area of the house (SQFT) as predictor variable. State the estimated value of the intercept and the estimated coefficient for the area variable.
+```{R}
+m <- lm(LAST_SALE_PRICE ~ SQFT, data=sales)
+s <- lm(LAST_SALE_PRICE ~ SQFT, data=sales)
+
+y_intercept <- s$coefficients[[1]]
+beta_1 <- s$coefficients[[2]]
+r_squared <- s$r.squared
+
+s
+```
+The estimated y-intercept is `r y_intercept` and the estimated coefficient is `r beta_1`.
+
+### 4. Write the equation that describes the relationship between the mean sale price and SQFT.
+\begin{align*}
+&\hat{y} = `r y_intercept` + `r beta_1`x
+\end{align*}
+
+### 5. State the interpretation in words of the estimated intercept.
+The y-intercept is the estimated mean sale price of a 0 square ft house. 
+
+### 6. State the interpretation in words of the estimated coefficient for the area variable.
+The estimated coefficient is the average amount the price increases for each additional square ft of area. 
+
+### 7. Add the LOT_SIZE variable to the linear regression model (Model 2). How did the estimated coefficient for the SQFT variable change?
+```{R}
+m_multi <- lm(LAST_SALE_PRICE ~ SQFT + LOT_SIZE, data=sales)
+s_multi <- summary(m_multi)
+y_intercept_multi <- s_multi$coefficients[[1]]
+beta_1_multi <- s_multi$coefficients[[2]]
+beta_2_multi <- s_multi$coefficients[[3]]
+r_squared_multi <- s_multi$r.squared
+
+s_multi
+```
+The estimated coefficient for SQFT increased slightly to `r beta_1_multi`.
+
+### 8. State the interpretation of the coefficient of SQFT in Model 2.
+The estimated coefficient for SQFT is the same as model one, except the estimate also factors in lot size. 
+
+### 9. Report the R-squared values from the two models. Explain why they are different.
+R-squared from first model: `r r_squared`
+
+R-squared from second model: `r r_squared_multi`
+
+R-squared is larger for the second model because there is an additional variable, and therefore, additional potential variance in the response due to influence of other variables. 
+
+### 10. Report the estimates of the error variances from the two models. Explain why they are different.
+```{r}
+rs = s$residuals
+s_var <- sum(rs^2)/(length(rs) - 2)
+
+rs_multi = s_multi$residuals
+s_var_multi <- sum(rs_multi^2)/(length(rs_multi) - 3)
+```
+Estimated error variance for Model 1: `r s_var`  
+
+Estimated error variance for Model 2: `r s_var_multi`  
+
+### 11. State the interpretation of the estimated error variance for Model 2.
+It is the average squared difference between the prediction and the actual sampled data.
+
+### 12. Test the null hypothesis that the coefficient of the SQFT variable in Model 2 is equal to 0. (Assume that the assumptions required for the test are met.)
+```{r}
+s_multi
+```
+
+We reject the null hypothesis that beta_sqft is 0. 
+
+### 13. Test the null hypothesis that the coefficients of both the SQFT and LOT_SIZE variables are equal to 0. Report the test statistic.
+```{r}
+anova(lm(LAST_SALE_PRICE ~ 1, data=sales), m_multi)
+```
+Test statistic: 2489.1 
+
+We reject the null hypothesis that the coefficients for SQFT and LOT_SIZE are 0. 
+
+### 14. What is the distribution of the test statistic under the null hypothesis (assuming model assumptions are met)?
+F with degrees of freedom 2 and 4062 (numerator and denominator, respectively).
+
+### 15. Report the p-value for the test in Q13.
+The p-value is: < 2.2e-16, which is very small. 
