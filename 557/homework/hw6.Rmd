@@ -1,0 +1,31 @@
+---
+title: "hw6"
+author: "Corbin Charpentier"
+date: "3/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r}
+# TODO include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+library(tidyverse)
+sales <- read_csv("../data/sales_sample.csv")
+
+sales
+```

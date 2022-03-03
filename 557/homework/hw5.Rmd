@@ -1,0 +1,102 @@
+---
+title: "HW V"
+author: "Corbin Charpentier"
+date: "2/23/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r}
+# TODO include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+
+library(tidyverse)
+sales <- read_csv("../data/sales_sample.csv")
+
+sales
+```
+
+The data are a random sample of size 1000 from the "Sales" data (after removing observations with missing values).
+
+### 1.1. Fit a linear regression model (Model 1) with sale price as response variable and SQFT, LOT_SIZE, BEDS, and BATHS as predictor variables. Add the fitted values and the residuals from the models as new variables in your data set. Show the R code you used for this question.
+
+```{R}
+model <- lm(LAST_SALE_PRICE ~ SQFT + LOT_SIZE + BEDS + BATHS, data=sales)
+sales_m <- sales %>% 
+    add_column(model$residuals) %>%
+    add_column(model$fitted.values)
+```
+
+### 1.2. Create a histogram of the residuals. Based on this graph does the normality assumption hold?
+
+```{R}
+hist(sales_m$`model$residuals`)
+```
+The normality assumption does hold. We see a small amount of outliers to the right, but they would not change the mean by much, which looks to be centered (correctly) on 0.
+
+## Answer the following questions using residual plots for the model. You may make the plots using the residuals and fitted variables added to your data set or you may use the 'plot' function. You do not need to display the plots in your submission.
+
+```{R, include=F} 
+plot(model)
+```
+
+### 1.3. Assess the linearity assumption of the regression model. Explain by describing a pattern in one or more residual plots.
+In the "Residuals vs Fitted" plot, we see curved line. The linearity assumption does not hold. 
+
+### 1.4. Assess the constant variance assumption of the regression model. Explain by describing a pattern in one or more residual plots.
+If variance were equal, we'd expect to see a flat line across the "Scale-location" plot. Instead, we see residuals increasing as the predicted price goes up.
+
+### 1.5. Assess the normality assumption of the linear regression model. Explain by describing a pattern in one or more residual plots.
+The Q-Q plot shows significant deviation at the tails for standardized residuals. The normality assumption does not hold. However, this is irrelevant because sample size is large enough for CLT to take effect. 
+
+### 1.6. Give an overall assessment of how well the assumptions hold for the regression model.
+No, the none of the assumptions withstood. 
+
+### 1.7. Would statistical inferences based on this model be valid? Explain.
+No, because the assumptions do not hold, variance, most obviously. 
+
+### 1.8. Create a new variable (I will call it LOG_PRICE) which is calculated as the log-transformation of the sale price variable. Use base-10 logarithms. Fit a linear regression model (Model 2) with LOG_PRICE as response variable and SQFT, LOT_SIZE, BEDS, and BATHS as predictor variables. Report the table of coefficient estimates with standard errors and p-values.
+```{R}
+sales_log <- sales %>% 
+    rowwise() %>%
+    mutate(log_price=log10(LAST_SALE_PRICE))
+
+model_log_price <- lm(log_price ~ SQFT + LOT_SIZE + BEDS + BATHS, data=sales_log)
+summary(model_log_price)
+```
+
+### 1.9. Give an interpretation of the estimated coefficient of the variable SQFT in Model 2.
+It is the estimated change in SQFT per unit change of log sale price, holding all other independent variables constant. It also significantly affects the dependent variable, according to the p-value. 
+
+## Answer the following questions using residual plots for Model 2. You do not need to display the plots in your submission.
+```{R, include=F}
+plot(model_log_price)
+```
+### 1.10. Assess the linearity assumption of Model 2. Explain by describing a pattern in one or more residual plots.
+Mean of all residuals near 0, according to "Residual vs Fitted" plot. Linearity stands.
+
+### 1.11. Assess the constant variance assumption of Model 2. Explain by describing a pattern in one or more residual plots.
+While the regression line between standardized residuals and fitted values is flatter than Model 1, it still is undeniably positively sloped, meaning variance increases as predicted log price increases. However, the slope is quite small, and I don't think it justifies a claim of heterscdasticity. Variance assumption holds.  
+
+### 1.12. Assess the normality assumption of Model 2. Explain by describing a pattern in one or more residual plots.
+Residuals are largely normal with significant deviation at either extreme. However, these are a relatively small amount of data points (perhaps 20 compared to the total size of 1000). The normality assumption does not hold, but it is irrelevant because of the large number of samples, large enough for CLT.  
+
+### 1.13. Give an overall assessment of how well the assumptions hold for Model 2.
+The assumptions hold better for Model 2 than Model 1. In fact, they all hold.
+
+### 1.14. Would statistical inferences based on Model 2 be valid? Explain.
+Again, I would perform inference on Model 2.
