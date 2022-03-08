@@ -2,7 +2,7 @@
 title: "hw6"
 author: "Corbin Charpentier"
 date: "3/3/2022"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
