@@ -126,6 +126,11 @@ The p-value is quite small: 8.893e-14
 #### 11. State the null hypothesis being tested in Q10 either in words or by using model formulas.
 The null hypothesis says that there is no significant difference between the coefficients of each model:
 $$H_0: \beta_{lot\_size}, \beta_{lot\_size^2} = 0$$
+$$log(GHG) = \beta_0 + \beta_1 X_{Income Level}$$
+$$log(GHG) = \beta_0 + \beta_1 X_{Income Level} + \beta_2 X_{Land Area} + \beta_3 X_{Ag Area} + \beta_4 X_{Forest Area}$$
+$$H_0: \beta_2 = \beta_3 = \beta_4 = 0$$
+$$log(GhgPerCapita) = beta_0 + beta_1 X_{FullAccess}$$
+$$H_0: \beta_1 = 0$$
 
 #### 12. Perform the robust Wald test to compare Model 1A and Model 1B. Report the p-value.
 ```{R}
