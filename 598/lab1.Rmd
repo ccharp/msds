@@ -21,12 +21,7 @@ consump_ts = ts(econseries$Consumption, freq=4, start=c(1970, 1))
 str(consump_ts)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+plot(consump_ts, main="US personal consumption expenditure", ylab="percent change")
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

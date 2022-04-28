@@ -16,7 +16,7 @@ knitr::knit_hooks$set(inline = function(x) {
 ```
 
 ```{r}
-# TODO include=FALSE}
+#  include=FALSE}
 rm(list=ls())
 
 pp <- function(...) {
@@ -24,22 +24,298 @@ pp <- function(...) {
 }
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+## 1. In this problem, we will make use of the Auto data set, which is part of the ISLR2 package.
+```{R, include=FALSE}
+# Import packages and data-sets as needed
+library(ISLR2)
+library("MASS")
+library(ggplot2)
+library(klaR)
+library(cvms)
+library(dplyr)
 ```
 
-## Including Plots
+### (a) Fit a least squares linear model to the data, in order to predict mpg using all of the other predictors except for name. Present your results in the form of a table. Be sure to indicate clearly how any qualitative variables should be interpreted.
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{R}
+lm_model <- lm(
+    mpg ~ cylinders + displacement + horsepower + weight + acceleration + year + factor(origin), 
+    data=Auto
+)
+summary(lm_model)
+```
+I chose to only interpret `origin` as a qualitative variable since its values do not have any relationship with each other, unlike `cylinders` or `year` where there is a notion of "increasing". Each class of `origin` appears to be significant, including class 1, which we verify by looking at the significance of the y-intercept. 
+
+### (b) What is the (training set) mean squared error of this model?
+```{R}
+MSE <- mean((Auto$mpg - predict(lm_model, Auto))^2)
+```
+We used all the data to train. Mean squared error is: `r MSE`.
+
+### (c) What gas mileage do you predict for a Japanese car with three cylinders, displacement 100, horsepower of 85, weight of 3000, acceleration of 20, built in the year 1980?
+
+```{R}
+auto_row <- as.data.frame.list(list(0, 3, 100, 85, 3000, 20, 80, 3, "Foo"), col.names=colnames(Auto))
+predicted_mpg <- predict(lm_model, newdata=auto_row)
+```
+We predict `r predicted_mpg` for this vehicle.
+
+### (d) On average, holding all other covariates fixed, what is the difference between the mpg of a Japanese car and the mpg of an American car?
+Based in the coefficient of the Japanese dummy variable and the fact that American vehicles are the basis of the `origin` variable, the MPG of a Japanese care, on average, is more fuel efficient by ~2.8 miles per gallon. 
+
+### (e) On average, holding all other covariates fixed, what is the change in mpg associated with a `10`-unit change in horsepower?
+We see that the coefficient for the `horsepower` variable is `-1.818e-02`. Multiplying that by `10`, the unite change, the MPG change associated with a 10-unit change in `horsepower` is `-0.181`. Said a different way, for every increase of `10 hoursepower`, MPG is expected to drop by `0.181`.
+
+## 2. Consider using only the origin variable to predict mpg on the Auto data set. In this problem, we will explore the coding of this qualitative variable.
+
+### (a) First, code the origin variable using two dummy (indicator) variables, with Japanese as the default value. Write out an equation like (3.30) in the textbook, and report the coefficient estimates. What is the predicted mpg for a Japanese car? for an American car? for a European car?
+
+The linear model is as follows:
+$$
+y_{i}=\beta_{0}+\beta_{1} x_{i 1}+\beta_{2} x_{i 2}+\epsilon_{i} = 
+    \begin{cases}
+        \beta_{0}+\beta_{1}+\epsilon_{i} & \text { if } i \text { th vehicle is from America } \\
+        \beta_{0}+\beta_{2}+\epsilon_{i} & \text { if } i \text { th vehicle is from Europe } \\
+        \beta_{0}+\epsilon_{i} & \text { if } i \text { th vehicle is from Japan }
+    \end{cases}
+$$
+```{R}
+# Filter out all the variables we don't need
+summary(lm(mpg ~ relevel(factor(origin), ref="3"), data=Auto))
+```
+R's `lm()` function already does the dummy variable creation for us--we merely need to specify the default value. Using only the `origin` variable as a predictor, the expected MPG of a Japanese care is `30.4506`MPG, the y-intercept of the model. The predicted MPGs for European and American cars, respectively, are `30.4506 - 10.4172 = ~20.14` and `30.4506 - 2.8577 = ~27.65`
+
+
+### (b) Now, code the origin variable using two dummy (indicator) variables, with American as the default. Write out an equation like (3.30) in the textbook, and report the coefficient estimates. What is the predicted mpg for a Japanese car? for an American car? for a European car?
+
+$$
+y_{i}=\beta_{0}+\beta_{1} x_{i 1}+\beta_{2} x_{i 2}+\epsilon_{i} = 
+    \begin{cases}
+        \beta_{0}+\beta_{1}+\epsilon_{i} & \text { if } i \text { th vehicle is from Europe } \\
+        \beta_{0}+\beta_{2}+\epsilon_{i} & \text { if } i \text { th vehicle is from Japan } \\
+        \beta_{0}+\epsilon_{i} & \text { if } i \text { th vehicle is from America}
+    \end{cases}
+$$
+```{R}
+# Filter out all the variables we don't need
+summary(lm(mpg ~ relevel(factor(origin), ref="1"), data=Auto))
+```
+The results are identical to problem 3b, except, here, the y-intercept represents MPG for American vehicles.
+
+### (c) Now, code the origin variable using two variables that take on values of +1 or -1. Write out an equation like (3.30) in the textbook, and report the coefficient estimates. What is the predicted mpg for a Japanese car? for an American car? for a European car?
+$$
+y_{i}=\beta_{0}+\beta_{1} x_{i 1}+\beta_{2} x_{i 2}+\epsilon_{i} = 
+    \begin{cases}
+        \beta_{0}+\beta_{1}-\beta_{2}+\epsilon_{i} & \text { if } i \text {th vehicle is from America } \\
+        \beta_{0}-\beta_{1}+\beta_{2}+\epsilon_{i} & \text { if } i \text {th vehicle is from Europe } \\
+        \beta_{0}-\beta_{1}-\beta_{2}+\epsilon_{i} & \text { if } i \text {th vehicle is from Japan } \\
+    \end{cases}
+$$
+```{R}
+dfOrigin <- dplyr::select(Auto, c(mpg, origin))
+
+dfWeird <- dfOrigin %>% mutate(
+    american = ifelse(origin == 1, 1, -1),
+    european = ifelse(origin == 2, 1, -1),
+    japanese = ifelse(origin == 3, 1, -1),
+)
+
+summary(lm(mpg ~ american + european, data=dfWeird))
+```
+Predicted MPG for an American car = `23.8182 - (-5.2086) - (-1.5238) = 30.5506`
+Predicted MPG for a Japanese car = `23.8182 + (-5.2086) - (-1.5238) = 20.1334`
+Predicted MPG for a Japanese car = `23.8182 - (-5.2086) + (-1.5238) = 27.503`
+
+### (d) Finally, code the origin variable using a single variable that takes on values of 0 for Japanese, 1 for American, and 2 for European. Write out an equation like (3.30) in the textbook, and report the coefficient estimates. What is the predicted mpg for a Japanese car? for an American car? for a European car?
+$$
+y_{i}=\beta_{0}+\beta_{1} x_{i 1}+ x_{i 2}+\epsilon_{i} = 
+    \begin{cases}
+        \beta_{0}+\beta_{1}* 1+\epsilon_{i} & \text { if } i \text {th vehicle is from America } \\
+        \beta_{0}+\beta_{1}* 2+\epsilon_{i} & \text { if } i \text {th vehicle is from European } \\
+        \beta_{0}+\beta_{1}* 3+\epsilon_{i} & \text { if } i \text {th vehicle is from Japanese } \\
+    \end{cases}
+$$
+```{R}
+summary(lm(mpg ~ origin, data=Auto))
+```
+Predicted MPG for American car = `14.8120 + 5.4765(1) = 20.2885`
+Predicted MPG for European car = `14.8120 + 5.4765(2) = 25.765`
+Predicted MPG for Japanese car = `14.8120 + 5.4765(3) = 31.2415`
+
+### (e) Comment on your results in (a)-(d).
+It makes sense that the results from 5a and 5b are exact matches since we're merely changing the order commutative arithmetic. It also makes sense that the predicted MPGs for 5c are very close to 5a and 5b, albeit with different coefficients (since the associated coefficient is reflected across zero instead of dropped out when the category isn't present), since a salient difference still exists between the presence and un-presence of a category (1 if its there, -1 if it's not) and we still have a variable for each category.
+
+This change for 5d when we encode the qualitative variable as quantitative. Instead of encoding a qualitative state as summation of on-or-off variables, we encode it as a series of discrete intervals on the Real number line. OLS simply fits a model that interpolates through the three categories.
+
+
+## 3. Fit a model to predict mpg on the Auto dataset using origin and horsepower, as well as an interaction between origin and horsepower. Present your results, and write out an equation like (3.35) in the textbook. On average, how much does the mpg of a Japanese car change with a one-unit increase in horsepower? How about the mpg of an American car? a European car?
+$$
+y_{i} \approx \beta_{0}+\beta_{4} \times \text {horsepower}_{i}+ 
+    \begin{cases}
+        \beta_{2} + \beta_5 \times \text{horsepower}_i \text { if } i \text {th car is European } \\
+        \beta_{3} + \beta_6 \times \text{horsepower}_i \text { if } i \text {th car is Japanese } \\
+        0 \text { if } i \text {th car is American }
+    \end{cases} 
+$$
+
+```{R}
+summary(lm(mpg ~ factor(origin) + horsepower + factor(origin):horsepower, data=Auto))
+```
+Average MPG change per unit change in in horsepower for...
+American cars = `-0.121320`
+European cars = `-0.121320 + -0.100515 = -0.221835`
+Japanese cars = `-0.121320 + -0.108723 = -0.230043`
+
+
+## 4. 5. and 6
+SEE HAND-WRITTEN SECTION BELOW TYPED REPORT. 
+
+
+## 7. In this problem, you will generate data with $p = 2$ features and a qualitative response with $K = 3$ classes, and $n = 50$ observations per class. You will then apply linear discriminant analysis to the data.
+
+### (a) Generate data such that the distribution of an observation in the $k$th class follows a $N(\mu_k,\Sigma)$ distribution, for $k = 1,...,K$. That is, the data follow a bivariate normal distribution with a mean vector $\mu_k$ that is specific to the $k$th class, and a covariance matrix $\Sigma$ that is shared across the $K$ classes. Choose $\Sigma$ and $\mu_1,...,\mu_K$ such that there is some overlap between the $K$ classes, i.e. no linear decision boundary is able to perfectly separate the training data. Specify your choices for $\Sigma$ and $\mu_1,...,\mu_K$.
+```{R}
+K <- 3 # Number of qualitative response classes
+p <- 2 # Number of predictors 
+n <- 50 # Number of observations per class
+
+gen_7_data_for_class <- function(klass, mus, covmat) {
+    x1x2 <- as.data.frame.matrix(mvrnorm(n=n, mu=mus, Sigma=covmat)) %>% 
+        bind_cols(replicate(n, factor(klass)))
+    colnames(x1x2) <- c("x1", "x2", "class")
+    x1x2
+}
+
+gen_7_data <- function() {
+    covmat <- matrix(c(1, 0.3, 0.3, 1), 2, 2)
+    gen_7_data_for_class(1, c(-2, -2), covmat) %>%
+        bind_rows(gen_7_data_for_class(2, c(0, 0), covmat)) %>%
+        bind_rows(gen_7_data_for_class(3, c(2, 2), covmat))
+}
+
+
+df7a <- gen_7_data()
+
+head(df7a)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+$$
+\begin{aligned}
+    \Sigma_k &= 
+    \begin{bmatrix}
+        1 & 0.3 \\
+        0.3 & 1
+    \end{bmatrix}
+    \text{ for } k = 1,2,3 \\ 
+    \boldsymbol{\mu_1} &= (-2, -2)^T \\
+    \boldsymbol{\mu_2} &= (0, 0)^T \\
+    \boldsymbol{\mu_3} &= (2, 2)^T
+\end{aligned}
+$$
+
+### (b) Plot the data, with the observations in each class displayed in a different color. Compute and display the Bayes decision boundary (or Bayes decision boundaries) on this plot. This plot should look something like the right-hand panel of Figure 4.6 in the textbook (although no need to worry about shading the background, and also you don’t need to display the LDA decision boundary for this sub-problem — you will do that in the next sub-problem). Be sure to label which region(s) of the plot correspond to each class.
+```{R}
+qplot(x1, x2, main="Q7b: Generated Data", color=class, data=df7a) + 
+    scale_color_manual(values=c("1"="red", 
+                                "2"="blue",
+                                "3"="green")) +
+    geom_abline(intercept=-2, slope=-1, color="magenta", linetype="dashed") + # k=1, k=2 boundary
+    geom_abline(intercept=0, slope=-1, color="yellow", linetype="dashed") +      # k=1, k=3 boundary
+    geom_abline(intercept=2, slope=-1, color="cyan", linetype="dashed")       # k=2, k=3 boundary
+
+```
+Magenta line: $k=1,k=2$ Boundary
+
+Yellow line: $k=1,k=3$ Boundary
+
+Cyan line: $k=2,k=3$ Boundary
+
+(For the work to generate this lines, see hand written section at the end of this report)
+
+### (c) Fit a linear discriminant analysis model to the data, and make a plot that displays the observations as well as the decision boundary (or boundaries) corresponding to this fitted model. How does the LDA decision boundary (which can be viewed as an estimate of the Bayes decision boundary) compare to the Bayes decision boundary that you computed and plotted in (b)?
+```{R}
+ldaModel <- lda(class ~ ., data=df7a)
+print(ldaModel)
+partimat(class ~ ., data=df7a, method="lda")
+```
+The plane is separated into three partitions.
+The blue region is the decision area for $k=1$
+The white region is the decision area for $k=2$
+The magenta region is the decision area for $k=3$
+
+The estimates are "not bad", meaning in the neighborhood of the data, the boundaries run nearly parallel with a slope of 1, as they should. The y-intercepts also appear to closely align with the Bayes' boundary lines. 
+
+### (d) Report the $K x K$ confusion matrix for the LDA model on the training data. The rows of this confusion matrix represent the predicted class labels, and the columns represent the true class labels. (See Table 4.4 in the textbook for an example of a confusion matrix.) Also, report the training error (i.e. the proportion of training observations that are misclassified).
+```{R}
+testAndPrint <- function(model, df) {
+    df['prediction'] <- predict(model, df)$class
+    conf_mat <- confusion_matrix(
+        targets=df$class,
+        predictions=df$prediction
+    )
+    
+    
+    # Now compute the training error
+    perr <- 1 - sum(df$class == df$prediction)/150
+    pp("Prediction error ", perr)
+    
+    conf_mat
+}
+
+conf_mat <- testAndPrint(ldaModel, df7a)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]])
+```
+
+### (e) Generate $n = 50$ test observations in each of the $K$ classes, using the bivariate normal distributions from (a). Report the $K x K$ confusion matrix, as well as the test error, that results from applying the model fit to the training data in (c) to your test data.
+```{R}
+df7aTest <- gen_7_data()
+
+conf_mat <- testAndPrint(ldaModel, df7aTest)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]])
+```
+
+### (f) Compare your results from (d) and (e), and comment on your findings.
+The results are highly comparable, which makes sense because the testing and training set were generated using the same distribution. The differences between the training and testing prediction results can be explained by the model bias, variance, and random noise. We also see that, because the Class 2 region is bounded on two sides, it has the highest error rate (Class 2 points spread into both the regions for Class 1 and Class 3).
+
+
+## 8. In this problem, you will apply quadratic discriminant analysis to the data from Q7.
+
+### (a) Fit a quadratic discriminant analysis model to the training data from Q7,and make a plot that displays the observations as well as the QDA decision boundary (or boundaries) corresponding to this fitted model. Be sure to label which region(s) of the plot correspond to each class. How does the QDA decision boundary compare to the Bayes decision boundary that you computed in Q7(b)?
+```{R}
+qdaModel <- qda(class ~ ., data=df7a)
+print(qdaModel)
+partimat(class ~ ., data=df7a, method="qda")
+```
+The plane is separated into three partitions.
+The blue region is the decision area for $k=1$
+The white region is the decision area for $k=2$
+The magenta region is the decision area for $k=3$
+
+### (b) Report the $K x K$ confusion matrix for the QDA model on the training data, as well as the training error.
+```{R}
+conf_mat <- testAndPrint(qdaModel, df7a)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]])
+```
+
+### (c) Repeat (b), but this time using the test data generated in Q7. (That is, apply the model fit to the training data in (a) in order to calculate the test error.)
+```{R}
+conf_mat <- testAndPrint(ldaModel, df7aTest)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]])
+```
+
+
+### (d) Compare your results in (b) and (c), and comment on your findings.
+Again, we expect these results to be high comparable (which they are) because the data is iid. It's a matter of random chance whether more points for a class in the test set land in that class's decision boundary established by the training set. The error rates between test and training sets would continue to converge as $n$ increases. 
+
+
+### (e) Which method had smaller _training error_ in this example: LDA or QDA? Comment on your findings.
+QDA. Intuitively, this may be because the generated data for each class becomes more sparse as distance increases from the mean, equally in all directions. This means that distribution of data is roughly circular around the mean (i.e. the boundary is not a line). Consequently, a quadratic function can better approximate this boundary than a linear one.
+
+
+### (f) Which method had smaller _test error_ in this example: LDA or QDA? Comment on your findings.
+QDA, for the same reasons as Q8e
+
+## 9.
+SEE HAND-WRITTEN SECTION BELOW 
+
