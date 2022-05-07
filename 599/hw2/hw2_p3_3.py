@@ -2,11 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
 
-import torchvision
-from torchvision.datasets import MNIST
-from torchvision import transforms
+from sklearn.kernel_ridge import KernelRidge
 
 import numpy as np
 import pandas as pd
@@ -19,33 +16,31 @@ def pp(s):
 
 class Net(nn.Module):
 
-    def __init__(self):
+    def __init__(self, depth, width, initVariance):
         super(Net, self).__init__()
-        # 1 input image channel, 6 output channels, 5x5 square convolution
-        # kernel
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        # an affine operation: y = Wx + b
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)  # 5*5 from image dimension
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+
+        self.preLayers = nn.ModuleList()
+        for _ in range(depth):
+            newLayer = nn.Linear(width, width)
+            nn.init.normal_(newLayer.weight, 0, np.sqrt(initVariance))
+            self.preLayers.append(newLayer)
+
+        self.outputLayer = nn.Linear(width, 1)
 
     def forward(self, x):
-        # Max pooling over a (2, 2) window
-        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
-        # If the size is a square, you can specify with a single number
-        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-        x = torch.flatten(x, 1) # flatten all dimensions except the batch dimension
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+        x = torch.flatten(x, 2, 3)
+
+        for l in self.preLayers:
+            x = F.relu(l(x))
+
+        y = F.relu(self.outputLayer(x))
+        return torch.squeeze(y)
 
 
     def fit(self, batches, loss_fn, optimizer, epochs_n=10): # TODO: change back to 10
         loss_per_epoch = []
 
-        for i in range(epochs_n):
+        for i in range(epochs_n): # TODO no batches
             batch_loss = 0
             pp(f"### Epoch #{i}")
 
@@ -63,71 +58,67 @@ class Net(nn.Module):
 
         return loss_per_epoch 
 
-# setup data
-train_data_raw = MNIST(
-    root='data', 
-    train=True, 
-    transform=torchvision.transforms.Compose(
-        [
-            torchvision.transforms.Resize(32),
-            torchvision.transforms.ToTensor(),
-        ]), 
-    download=True
-)
-
-# TODO: all of these *Experiment functions can be generalized further
-def sgdExperiments(learning_rates, batch_sizes):
-    experiments = []
-    for batch_size in batch_sizes:
-        for lr in learning_rates:
-            net = Net()
-            experiments.append({
-                "net": net,
-                "optimizer": optim.SGD(net.parameters(), lr=lr),
-                "batch_size": batch_size,
-            })
-
-    def plot(exps_data):
-        do_plot(
-            exps_data,
-            batch_sizes,
-            learning_rates,
-            "Batch Size", "Learning Rate",
-            "SGD",
-        )
-
-    return {"plot_fn": plot, "exps": experiments}
-
-
-def gen_data(n):
-    def gen_d_sphere(r, d):
+def genData(n, m):
+    def relu(num):
+        return 0 if num < 0 else num
+    def genNSphere(r, d):
         v = np.random.normal(0, r, d)  
         d = np.sum(v**2) **(0.5)
         return v/d
 
-    xs = [gen_d_sphere(1, 9) for _ in range(n)]
-    ys = "TODO"
+    xss = [genNSphere(1, 9) for _ in range(n)]
+    ys = []
+    for xs in xss:
+        ys.append(sum(map(relu, xs))/m)
 
-    return "TODO"
+    return (np.array(xss), np.array(ys))
 
-# Declare the experiments we're going to run. This is the program! 
-experiments = [ # [Hypers]
-    sgdExperiments([0.001, 0.01, 0.1], [60000]),
-    sgdExperiments([0.001, 0.01, 0.1], [128, 512]),
-]
+############ BEGIN APPLICATION ############ 
+ns = [20, 40, 80, 160]
+d = 10
+m = 5
 
-for exp_class in experiments:
-    history = []
+def calcError(preds, targets):
+    return 0 # TODO
 
-    for exp in exp_class["exps"]:
-        net = exp["net"]
+def arcKernel(x1: np.array, x2: np.array):
+    x1Tx2 = np.transpose(x1) * x2
+    return x1Tx2*(np.pi - np.arccos(x1Tx2))/(2*np.pi)
 
-        train_batches = DataLoader(train_data_raw, batch_size=exp["batch_size"], shuffle=True)
+def plotResults(df):
+    sns.color_palette("Set2")
 
-        history.append(net.fit(
-            train_batches, 
-            nn.CrossEntropyLoss(),
-            exp["optimizer"],
-        ))
+    df['Loss'] = np.log(df['Loss'].astype(float))
 
-    exp_class["plot_fn"](history)
+    title = f"Loss per Epoch with"
+    plot = sns.lineplot(
+        data=df, x="N", y="Loss", hue="ModelType", ci=None
+    ).set_title(title)
+    plot.figure.savefig(f"{title}_{d}_{a}.png")
+    plot.figure.clf()
+
+historyDf = pd.DataFrame(columns=[
+            "N", "Loss", "ModelType"
+])
+
+def addHistoryRow(df, loss, modelType):
+    new_row = pd.DataFrame(columns=df.columns)
+    new_row.loc[0] = [loss, modelType]
+    df = pd.concat([df, new_row], ignore_index=True)
+    return df
+
+for n in ns:
+    trainXs, trainYs = genData(n, m)
+    testXs, testYs = genData(1000, m)
+
+    net = Net(depth=m, width=d)
+    _ = net.fit(trainXs, trainYs)
+    nnError = calcError(net(testXs, testYs))
+    historyDf = addHistoryRow(historyDf, nnError, "Neureal Network")
+
+    krr = KernelRidge(kernel=arcKernel)
+    krr.fit(trainXs, trainYs)
+    krrError = calcError(krr.predict(testXs))
+    historyDf = addHistoryRow(historyDf, krrError, "Kernel Regression")
+
+
