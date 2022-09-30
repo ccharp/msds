@@ -1,0 +1,257 @@
+---
+title: 'Homework #4'
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r}
+#  include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+```
+
+## 1. In this problem, we will make use of the Auto data set, which is part of the ISLR2 package.
+```{R, include=FALSE}
+# Import packages and data-sets as needed
+library(ggplot2)
+library(dplyr)
+library(gsubfn)
+library(purrr)
+set.seed(1)
+```
+## Instructions:
+You may discuss the homework problems in small groups, but you must write up the final solutions and code yourself. Please turn in your code for the problems that involve coding. However, code without written answers will receive no credit. To receive credit, you must explain your answers and show your work. All plots should be appropriately labeled and legible, with axis labels, legends, etc., as needed.
+
+_On this assignment, some of the problems involve random number generation. Be sure to set a random seed (using the command ${\tt set.seed()}$) before you begin._
+
+## 1. Suppose that a curve $\hat{g}$ is computed to smoothly fit a set of $n$ points using the following formula: $$\hat{g} = arg \mathop{min}_g\left(\sum_{i=1}^{n}(y_i - g(x_i))^2 + \lambda \int \left[g^{(m)}(x)\right]^2 \; dx\right),$$ where $g^{(m)}$ represents the $m$th derivative of $g$ (and $g^{(0)} = g$). Provide example sketches of $\hat{g}$ in each of the following scenarios.
+
+![Problem 1](p1.png)
+
+## 2. Suppose we fit a curve with basis functions $b_1(X) = I(0 \le X \le 2) - (X + 1)I(1 \le X \le 2)$, $b_2(X) = (2X - 2)I(3 \le X \le 4) - I(4 < X \le 5)$. We fit the linear regression model $$Y = \beta_0 + \beta_1b_1(X) + \beta_2b_2(X) + \epsilon,$$ and obtain coefficient estimates $\hat{\beta}_0 = 2$, $\hat{\beta}_1 = 3$, $\hat{\beta}_2 = -2$. Sketch the estimated curve between $X = -2$ and $X = 6$. Note the intercepts, slopes, and other relevant information.
+
+```{R}
+b1 <- function(x) {
+    0 + (0 <= x && x <= 2) - (x + 1)*(1 <= x && x <= 2)
+}
+
+b2 <- function(x) {
+    (2*x - 2)*(3 <= x && x <= 4) - (4 < x && x <= 5)
+}
+
+f <- function(x) {
+    2 + 3*b1(x) - 2*b2(x) 
+}
+
+xs <- seq(from=-2, to=6, by=0.001)
+ys <- map_dbl(xs, f)
+
+df <- cbind(data.frame(xs), data.frame(ys))
+
+ggplot(data=df, aes(x=xs, y=ys)) +
+    geom_line() +
+    labs(title="Basis plot",x="X", y = "Y") +
+    theme_bw()
+
+yint <- f(0)
+```
+The plot estimates the curve using by subdividing each integer into 1,000 x-values. The y-intercept is `r yint`. The slope is non-zero only where $1 \le x \le 2$, where slope is $-2$, and $3 \le X \le 4$, where slope is $-4$
+
+## 3.  Prove that any function of the form $$f(X) = \beta_0 + \beta_1X + \beta_2X^2 + \beta_3X^3 + \beta_4(X - \psi)^3_+$$ is a cubic spline with a knot at $\psi$.
+
+![Problem 1](p3.png)
+
+## 4. For this problem, we will use the ${\tt Wage}$ data set that is part of the ${\tt ISLR}$ package. Split the data into a training set and a test set, and then fit using the following models to predict ${\tt Wage}$ using ${\tt Age}$ on the training set. Make some plots, and comment on your results. 
+
+### (a) polynomial
+
+```{R}
+library(ISLR2)
+
+splitData <- function(df, trainProportion) {
+    df <- df %>% mutate(id = row_number())
+    
+    set.seed(1)
+    train <- sample_frac(df, trainProportion)
+    test <- anti_join(df, train, by='id')
+    
+    df <- df %>% mutate(id=NULL)
+    
+    return(list(train=train, test=test))
+}
+
+calcError <- function(ys, ys_hat) {
+    mean((ys - ys_hat)^2)
+}
+
+myPred <- function(model, df, ysLabel) {
+    
+    preds <- predict(model, newdata=df, se=TRUE)
+    df[paste0("predicted_", ysLabel)] <- preds$fit
+    df["seTop"] <- preds$fit + 2*preds$se.fit
+    df["seBot"] <- preds$fit - 2*preds$se.fit
+    return(df)
+}
+
+drawPlot <- function(df, title) {
+    ggplot(data=df, aes(x=age, y=wage)) +
+        geom_point(size=0.25) +
+        geom_line(data=df, aes(x=age, y=predicted_wage)) +
+        geom_line(data=df, aes(x=age, y=seTop), color="red") + 
+        geom_line(data=df, aes(x=age, y=seBot), color="red") +
+        labs(title=title, x="Age", y = "Wage") +
+        theme_bw()
+}
+
+dfPoly <- Wage
+
+split <- splitData(dfPoly, 0.7)
+
+# Now make a polynomial model!
+pmodel <- lm(wage ~ poly(age, 4), data=split$train)
+summary(pmodel)
+testedDf <- myPred(pmodel, split$test, "wage")
+pp("MSE: ", calcError(testedDf$wage, testedDf$predicted_wage))
+drawPlot(testedDf, "Wage data fit with Cubic Polynomial")
+```
+### (b) step function
+
+```{R}
+pmodel <- lm(wage ~ cut(age, 4), data=split$train)
+summary(pmodel)
+testedDf <- myPred(pmodel, split$test, "wage")
+pp("MSE: ", calcError(testedDf$wage, testedDf$predicted_wage))
+drawPlot(testedDf, "Wage data fit with Stepwise Function (#Stepts=5)")
+```
+
+### (c) piecewise polynomial
+
+```{R}
+pmodel <- lm(wage ~ cut(age, 4) + poly(age, 4), data=split$train)
+summary(pmodel)
+testedDf <- myPred(pmodel, split$test, "wage")
+pp("MSE: ", calcError(testedDf$wage, testedDf$predicted_wage))
+drawPlot(testedDf, "Wage data fit with Cubic Polynomial")
+```
+
+### (d) cubic spline
+
+```{R}
+library(splines)
+
+pmodel <- lm(wage ~ bs(age, knots=c(30, 45, 60)), data=split$train)
+summary(pmodel)
+testedDf <- myPred(pmodel, split$test, "wage")
+pp("MSE: ", calcError(testedDf$wage, testedDf$predicted_wage))
+drawPlot(testedDf, "Wage data fit with Cubic Polynomial")
+```
+
+### (e) smoothing spline
+
+```{R}
+pmodel <- lm(wage ~ ns(age, df=4), data=split$train)
+summary(pmodel)
+testedDf <- myPred(pmodel, split$test, "wage")
+pp("MSE: ", calcError(testedDf$wage, testedDf$predicted_wage))
+drawPlot(testedDf, "Wage data fit with Cubic Polynomial")
+```
+Using RSS as the performance metric, 
+
+## 5. Use the ${\tt Auto}$ data set to predict a car’s ${\tt mpg}$. (You should remove the ${\tt name}$ variable before you begin.)
+
+### (a) First, try using a regression tree. You should grow a big tree, and then consider pruning the tree. How accurately does your regression tree predict a car’s gas mileage? Make some figures, and comment on your results.
+
+
+```{R}
+library(tree)
+library(rpart)
+library(rpart.plot)
+
+dfAuto <- Auto
+dfAuto <- subset(dfAuto, select=-c(name))
+split <- splitData(dfAuto, 0.7)
+
+set.seed(1)
+tmodel <- rpart(mpg ~ cylinders + displacement + horsepower + weight + acceleration + factor(origin), data=split$train)
+
+rpart.plot(tmodel)
+
+treePredsTrain <- predict(tmodel, split$train)
+treePredsTest <- predict(tmodel, split$test)
+
+pp("MSE train: ", calcError(split$train$mpg, treePredsTrain))
+pp("MSE test: ", calcError(split$test$mpg, treePredsTest))
+
+plot(treePredsTest, split$test$mpg)
+```
+I considered pruning the tree further, but MSE between train and test is relatively small, so it's possible that different samples of data would yield similar, albeit slightly fluctuating results. Overall, the model performs surprisingly well. MSE is high relative to the range of the model. The tree is already quite simple with using the top four relevant parameters. 
+
+### (b) Fit a bagged regression tree model to predict a car’s ${\tt mpg}$ How accurately does this model predict gas mileage? What tuning parameter value(s) did you use in fitting this model?
+
+```{R}
+library(randomForest)
+
+set.seed(1)
+bag.auto <- randomForest(mpg ~ cylinders + displacement + horsepower + weight + acceleration + origin,
+                           data=split$train,
+                           mtry=6, importance=TRUE)
+
+bag.auto
+
+bagPreds <- predict(bag.auto, split$test)
+
+plot(bagPreds, split$test$mpg)
+pp("MSE test: ", calcError(split$test$mpg, bagPreds))
+```
+Hyperparameters: 500 trees, $m=p$. The model had a slightly higher training MSE, implying a more general fit. This happened to lead to lower testing error for this particular testing set relative to the single decision tree. Overall, the results are surprisingly comparable to the simple tree. 
+
+
+### (c) Fit a random forest model to predict a car’s ${\tt mpg}$ How accurately does this model predict gas mileage? What tuning parameter value(s) did you use in fitting this model?
+
+```{R}
+library(randomForest)
+
+set.seed(1)
+bag.auto <- randomForest(mpg ~ cylinders + displacement + horsepower + weight + acceleration + origin,
+                           data=split$train,
+                           mtry=3, importance=TRUE)
+
+bag.auto
+importance(bag.auto)
+
+bagPreds <- predict(bag.auto, split$test)
+
+plot(bagPreds, split$test$mpg)
+pp("MSE test: ", calcError(split$test$mpg, bagPreds))
+```
+The only difference between C and B is the number of variables considered at teach tree split. Using only the three most important variables improves training MSE while not penalizing test MSE, implying that we're closer to the optimal combination of flexibility and generalizability. Like each of the previous models, we see increased error variance as precitions increase in value.
+
+### (d) Fit a generalized additive model (GAM) model to predict a car’s ${\tt mpg}$ How accurately does your GAM model predict a car’s gas mileage? Make some figures to help visualize the fitted functions in your GAM model, and comment on your results.
+
+```{R}
+library(gam)
+
+gmodel <- gam(mpg ~ s(cylinders) + s(displacement) + s(horsepower) + s(weight) + s(acceleration) + factor(origin),
+              data=split$train)
+
+summary(gmodel)
+
+pp("MSE test: ", calcError(split$test$mpg, predict(gmodel, split$test)))
+
+```
+We see high significance for all predictors. 
+
+### (e) Considering both accuracy and interpretability of the fitted model, which of the models in (a)–(d) do you prefer? Justify your answer.
+I'd go with the GAM, simply because it makes use more predictors with better performance than any of the tree-based models. 

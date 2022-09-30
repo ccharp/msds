@@ -1,0 +1,408 @@
+---
+title: 'Homework #3'
+author: 'Corbin Charpentier'
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r}
+#  include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+```
+
+## 1. In this problem, we will make use of the Auto data set, which is part of the ISLR2 package.
+```{R, include=FALSE}
+# Import packages and data-sets as needed
+library(ggplot2)
+library(dplyr)
+library(gsubfn)
+set.seed(1)
+```
+# Instructions:
+You may discuss the homework problems in small groups, but you must write up the final solutions and code yourself. Please turn in your code for the problems that involve coding. However, code without written answers will receive no credit. To receive credit, you must explain your answers and show your work. All plots should be appropriately labeled and legible, with axis labels, legends, etc., as needed.
+
+_On this assignment, some of the problems involve random number generation. Be sure to set a random seed (using the command ${\tt set.seed()}$) before you begin._
+
+# 1. In this problem, we’ll see a (very!!) simple simulated example where a least squares linear model is “too flexible”.
+
+## (a) First, generate some data with $n$ = 100 and $p$ = 10,000 features, and a quantitative response, using the following ${\tt R}$ commands: $${\tt y <- rnorm(100)}$$ $${\tt x<-  matrix(rnorm(10000*100), ncol=10000)}$$ Write out an expression for the model corresponding to this data generation procedure. For instance, it might look something like $Y = 2X_1 + 3X_2 + \epsilon, \epsilon \sim N(0, 1)$.
+
+```{R}
+y <- rnorm(100)
+X <- matrix(rnorm(10000*100), ncol=10000)
+df1 <- as.data.frame(X)
+df1['y'] <- y
+```
+Let $Y,\beta,\epsilon \in \mathbb{R}^{100}$ and $X \in \mathbb{R}^{10000 X 100}$. Then the expression for the model corresponding to the above R code is
+$$
+Y=X^T\beta + \epsilon
+$$
+
+## (b) What is the value of the irreducible error?
+The irreducible error for each $Y_i$ is $\epsilon$, which is distributed $\epsilon ~ N(0,1)$.
+
+## (c) Consider a very simple model-fitting procedure that just predicts 0 for every observation. That is, $\hat{f}(x) = 0$ for all $x$.
+
+### i. What is the bias of this procedure?  
+The bias of the error of model for a prediction is:
+$$
+\text{Bias}=E\left[ \hat{f}(x)\right] - f(x) = -f(x)
+$$
+Since the data is standard-normally distributed, the bias of error is pretty close to $0$.
+
+### ii. What is the variance of this procedure?
+Since the model is constant, the variance is $0$.
+  
+### iii. What is the expected prediction error of this procedure?
+Generally, expected error is:
+$$
+\operatorname{Err}(x)=(E\left[\hat{f}(x)\right]-f(x))^{2}+E\left[(\hat{f}(x)-E[\hat{f}(x)])^{2}\right]+\sigma_{e}^{2}
+$$
+Plugging in the parameters of this model, we get:
+$$
+\operatorname{Err}(x)=(f(x))^2 + 0 + \epsilon
+$$
+Given the training data, the expected error will tend towards $\epsilon$.
+
+### iv. Use the validation set approach to estimate the test error of this procedure. What answer do you get?
+Since the model is constant and $0$, the estimated error depends entirely on how the training and test sets are partitioned, that is, $\epsilon$.
+```{R}
+
+splitData <- function(df, trainProportion) {
+    df <- df %>% mutate(id = row_number())
+    
+    set.seed(1)
+    train <- sample_frac(df, trainProportion)
+    test <- anti_join(df, train, by='id')
+    
+    df <- df %>% mutate(id=NULL)
+    
+    return(list(train=train, test=test))
+}
+
+split <- splitData(df1, 0.5)
+model <- lm(y ~ 0, split$train)
+
+pp("Test error: ", mean((df1$y - predict(model, split$test))^2))
+```
+
+### v. Comment on your answers to (iii) and (iv). Do your answers agree with each other? Explain.
+They do agree. In the end, the error for each strategy depends on random chance, i.e. $/epsilon$. 
+
+## (d) Now use the validation set approach to estimate the test error of a least squares linear model using $X_1,..., X_{10,000}$ to predict $Y$ . What is the estimated test error?
+In practice, we tend to over-estimate the bias because training set is smaller than the entire data set. For example, a training set consisting of only two data points could generate an extremely biased model. Here, however, since the model is constant, 
+```{R}
+model <- lm(y ~ ., split$train)
+
+pp("Test error: ", mean((df1$y - predict(model, split$test))^2))
+```
+
+## (e) Comment on your answers to (c) and (d). Which of the two procedures has a smaller estimated test error? higher bias? higher variance? In answering this question, be sure to think carefully about how the data were generated.
+The model for (c) has lower error because, while having high bias, the model exactly represents the mean of the population ($\mu = 0$), and since (c) is constant, it has lower variance of the two. That $ p > n$ does not matter for (c) since it uses none of the independent variables to predict the response. Model (d), however, very likely over fits the training data, hence the higher test error. Another way to say this is that (d) has much greater variance. 
+
+# 2. In lecture during Week 5, we discussed “Option 1” and “Option 2”: two possible ways to perform the validation set approach for a modeling strategy where you identify the $q$ features most correlated with the response, and then fit a least squares linear model to predict the response using just those $q$ features. If you missed that lecture, then please familiarize yourself with the lecture notes (posted on Canvas) before you continue. Here, we are going to continue to work with the simulated data from the previous problem, in order to illustrate the problem with Option 1.
+
+## (a) Calculate the correlation between each feature and the response. Make a histogram of these correlations. What are the values of the 10 largest absolute correlations?
+
+```{R}
+xcols <- !names(df1) %in% c("y")
+cors <- cor(df1[, xcols], df1["y"])
+
+hist(cors)
+
+top10Cors <- head(sort(abs(cors), decreasing=TRUE), 10)
+pp("Top 10 most correlated: ")
+pp(top10Cors)
+```
+
+## (b) Now try out “Option 1” with $q = 10$. What is the estimated test error?
+
+```{R}
+calcTopN <- function(df, n) {
+    dfCors <- as.data.frame(cor(df[, xcols], df["y"]))
+    dfCors <- dfCors %>% mutate(y=abs(y)) %>% arrange(desc(y)) %>% head(10)
+    labs <- labels(dfCors)[[1]]
+    return(df %>% select(append(labs, "y")))
+}
+
+dfO1 <- calcTopN(df1, 10)
+
+splitO1 <- splitData(dfO1, 0.5)
+
+modelO1 <- lm(y ~ ., data=splitO1$train)
+
+pp("Test error: ", mean((splitO1$test$y - predict(modelO1, splitO1$test))^2))
+```     
+
+
+## (c) Now try out “Option 2” with $q = 10$. What is the estimated test error?
+
+```{R}
+trainO2 <- calcTopN(split$train, 10)
+
+modelO2 <- lm(y ~ ., data=trainO2)
+
+testO2 <- select(split$test, colnames(trainO2))
+pp("Test error: ", mean((testO2$y - predict(modelO2, testO2))^2))
+```
+
+## (d) Comment on your results in (b) and (c). How does this relate to the discussion of Option 1 versus Option 2 from lecture? Explain how you can see that Option 1 gave you a useless (i.e. misleading, inaccurate, wrong) estimate of the test error.
+
+Option 1 undermines the entire motivation for having split training and testing sets. We want to ensure the model generalizes to unseen data. By calculating correlations with the whole data set (and then using the results of that calculating for feature selection), we effectively expose the model to the test data during training. This is why Option 1 has lower error than Option 2--it cheated! Option 2 does not suffer this problem. Option 2's feature selection is performed exclusively on the training data. 
+
+# 3. In this problem, you will analyze a (real, not simulated) dataset of your choice with a quantitative response $Y$ , and $p \ge 50$ quantitative predictors.
+
+## (a) Describe the data. Where did you get it from? What is the meaning of the response, and what are the meanings of the predictors?
+
+```{R}
+dfNews <- read.csv("OnlineNewsPopularity/OnlineNewsPopularity.csv")
+head(dfNews)
+dfNews <- dfNews %>% mutate(url=NULL, timedelta=NULL, n_non_stop_words=NULL)
+```
+
+## (b) Fit a least squares linear model to the data, and provide an estimate of the test error. (Explain how you got this estimate.)
+
+```{R}
+# V128 is the response
+library(regclass)
+predictAndError <- function(ys, xs, model) {
+    mean((ys - predict(model, xs))^2)
+}
+
+tmp <- cor(dfNews)
+tmp[upper.tri(tmp)] <- 0
+diag(tmp) <- 0
+
+dfNews1 <- 
+  dfNews[, !apply(tmp, 2, function(x) any(abs(x) > 0.90, na.rm = TRUE))]
+
+splitNews <- splitData(dfNews1, 0.7)
+model <- lm(shares ~ ., data=splitNews$train)
+
+model$rank
+print(nrow(dfNews1))
+
+pp("Test error: ", predictAndError(splitNews$test$shares, splitNews$test, model))
+# I do not know why I'm getting the rank-deficient warning.
+```
+
+## (c) Fit a ridge regression model to the data, with a range of values of the tuning parameter $\lambda$. Make a plot like the left-hand panel of Figure 6.4 in the textbook.
+
+```{R}
+library(glmnetUtils)
+
+
+trainXss <- as.matrix(splitNews$train %>% select(-shares))
+trainYs  <- as.matrix(splitNews$train["shares"])
+
+i <- 1
+m <- matrix(nrow=5, ncol=2)
+for(lam in list(1, 10, 100, 1000, 10000)) {
+    model <- glmnet(shares ~ ., data=splitNews$train, alpha=0, lambda=lam)
+    err <- predictAndError(splitNews$test$shares, splitNews$test, model)
+    
+    m[i, ] <- c(lam, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Ridge Regression: Lamda vs Error",x="Lambda", y = "Error") +
+    theme_classic()
+```
+
+## (d) What value of $\lambda$ in the ridge regression model provides the smallest estimated test error? Report this estimate of test error. (Also, explain how you estimated test error.)
+The optimal error for this data set and split appears to reside at $0.01 < \alpha < 0.05$. Error was estimated as follows:
+
+1. Split data set into training and testing partitions, 70|30 split. 
+2. Train model on training data
+3. Use predictions of trained model on test data to calculate Mean Squared Error. 
+
+## (e) Repeat (c), but for a lasso model.
+
+```{R}
+i <- 1
+m <- matrix(nrow=5, ncol=2)
+for(lam in list(1, 10, 50, 100, 200)) {
+    model <- glmnet(shares ~ ., data=splitNews$train, alpha=1, lambda=lam)
+    err <- predictAndError(splitNews$test$shares, splitNews$test, model)
+    
+    m[i, ] <- c(lam, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Lass Regression: Lamda vs Error",x="Lambda", y = "Error") +
+    theme_classic()
+```
+
+## (f) Repeat (d), but for a lasso model. Which features are included in this lasso model?
+All 56 features are included in this model. 
+
+# 4. In this problem, you may use the function in the ${\tt glmnet}$ package that performs cross-validation. Consider using the ${\tt Auto}$ data set to predict ${\tt mpg}$ using polynomial functions of ${\tt horsepower}$ in a least squares linear regression.
+
+## (a) Perform the validation set approach, and produce a plot like the one in the right-hand panel of Figure 5.2 of the textbook. Your answer won’t look _exactly_ the same as the results in Figure 5.2, since you’ll be starting with a different random seed. Discuss your findings. What degree polynomial is best, and why?
+
+```{R}
+library(ISLR2)
+dfAuto <- Auto
+
+head(dfAuto)
+
+splitAuto <- splitData(dfAuto, 0.7)
+
+m <- matrix(nrow=10, ncol=2)
+i <- 1
+for(d in 1:10) {
+    model <- lm(mpg ~ poly(horsepower, d), data=splitAuto$train)
+    err <- predictAndError(splitAuto$test$mpg, splitAuto$test, model)
+    print(err)
+    m[i, ] <- c(d, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Linear Regression: Degree vs Error",x="Degree of Polynomial", y = "Error") +
+    theme_classic()
+```
+The degree that minimizes error is somewhere between 2 and 4, inclusive (with this particular seed, it was 4). This implies that the true relationship between mpg and horsepower is more quadratic than linear. 
+
+## (b) Perform leave-one-out cross-validation, and produce a plot like the one in the left-hand panel of Figure 5.4 of the textbook. Discuss your findings. What degree polynomial is best, and why?
+
+```{R}
+library(boot)
+m <- matrix(nrow=10, ncol=2)
+i <- 1
+for(d in 1:10) {
+    model <- glm(mpg ~ poly(horsepower, d), data=dfAuto)
+    err <- cv.glm(dfAuto, model, K=nrow(dfAuto))$delta[1]
+    m[i, ] <- c(d, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Linear Regression: Degree vs Error, K=|Auto|",x="Degree of Polynomial", y = "Error") +
+    theme_classic()
+```
+We see the error initially minimized at degree two and then oscillating around that until finding the least error at degree. I think the higher degree models (above $d=2$) have slightly lower error because they are overfitting. Indeed, they include the second degree term already. 
+
+## (c) Perform 10-fold cross-validation, and produce a plot like the one in the right-hand panel of Figure 5.4 of the textbook. Discuss your findings. What degree polynomial is best, and why?
+
+```{R}
+m <- matrix(nrow=10, ncol=2)
+i <- 1
+for(d in 1:10) {
+    model <- glm(mpg ~ poly(horsepower, d), data=dfAuto)
+    err <- cv.glm(dfAuto, model, K=10)$delta[1]
+    m[i, ] <- c(d, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Linear Regression: Degree vs Error, K=10",x="Degree of Polynomial", y = "Error") +
+    theme_classic()
+```
+Results here largely align with what we saw in (b), althought slightly more exaggerated because of the smaller folds. 
+
+## (d) Fit a least squares linear model to predict ${\tt mpg}$ using polynomials of degrees from 1 to 10, using all available observations. Make a plot showing “Degree of Polynomial” on the _x_-axis, and “Training Set Mean Squared Error” on the _y_-axis. Discuss your findings.
+
+```{R}
+m <- matrix(nrow=10, ncol=2)
+i <- 1
+for(d in 1:10) {
+    model <- glm(mpg ~  cylinders + displacement + weight + acceleration + year + factor(origin) + poly(horsepower, d), data=dfAuto)
+    err <- cv.glm(dfAuto, model, K=10)$delta[1]
+    m[i, ] <- c(d, err)
+    i <- i + 1 
+}
+
+dfResults <- as.data.frame(m)
+
+ggplot(data=dfResults, aes(x=V1, y=V2, group=1)) +
+    geom_line() +
+    geom_point() +
+    labs(title="Linear Regression: Degree vs Error, All Predictors, K=10",x="Degree of Polynomial", y = "Error") +
+    theme_classic()
+```
+The primary difference between this and the (a) through (c) is the increase in error as degree increases (after the precipitous drop), although we still see the error largely leveling off after $d=2$.
+
+
+## (e) Fit a least squares linear model to predict ${\tt mpg}$ using a degree-10 polynomial, using all available observations. Using the ${\tt summary}$ command in ${\tt R}$, examine the output. Comment on the output, and discuss how this relates to your findings in (a)–(d).
+
+```{R}
+model <- lm(mpg ~  cylinders + displacement + weight + acceleration + year + factor(origin) + poly(horsepower, 10), data=dfAuto)
+
+summary(model)
+```
+Polynomials with $d>3$ are insignificant! By far the most significant degree is $d=2$. This corresponds with our findings above. Adding higher degree polynomials amounts to adding noise.
+
+# 5. _Extra Credit!_ Let’s consider doing least squares and ridge regression under a very simple setting, in which $p = 1$, and $\sum_{i = 1}^{n} y_i = \sum_{i = 1}^{n} x_i = 0$. We consider regression without an intercept. (It’s usually a bad idea to do regression without an intercept, but if our feature and response each have mean zero, then it is okay to do this!)
+
+_Hint: For this problem, you might want to brush up on some basic properties of means and variances! For instance, if $Cov(Z, W)$ = 0, then $Var(Z + W) = Var(Z) + Var(W)$. And if $a$ is a constant, then $Var(aW) = a^2Var(W)$, and $Var(a + W) = Var(W)$._
+
+## (a) The least squares solution is the value of $\beta \in \mathbb{R}$ that minimizes $\sum_{i = 1}^{n} (y_i - \beta x_i)^2$. Write out an analytical (closed-form) expression for this least squares solution. Your answer should be a function of $x_1,..., x_n$ and $y_1,..., y_n$. _Hint: Calculus!!_
+
+```{R}
+```
+
+## (b) For a given value of $\lambda$, the ridge regression solution minimizes $\sum_{i = 1}^{n} (y_i - \beta x_i)^2 + \lambda \beta ^2$. Write out an analytical (closed-form) expression for the ridge regression solution, in terms of $x_1,..., x_n$ and $y_1,..., y_n$ and $\lambda$.
+
+```{R}
+```
+
+## (c) Suppose that the true data-generating model is $Y = 3X + \epsilon$, where $\epsilon$ has mean zero, and $X$ is fixed (non-random). What is the expectation of the least squares estimator from (a)? Is it biased or unbiased?
+
+```{R}
+```
+
+## (d) Suppose again that the true data-generating model is $Y = 3X + \epsilon$, where $\epsilon$ has mean zero, and $X$ is fixed (non-random). What is the expectation of the ridge regression estimator from (b)? Is it biased or unbiased? Explain how the bias changes as a function of $\lambda$.
+
+```{R}
+```
+
+## (e) Suppose that the true data-generating model is $Y = 3X + \epsilon$, where $\epsilon$ has mean zero and variance $\sigma^2$, and $X$ is fixed (non-random), and also $Cov(\epsilon_i, \epsilon_{i^\prime})= 0$ for all $i \neq i^\prime$. What is the variance of the least squares estimator from (a)?
+
+```{R}
+```
+
+## (f) Suppose that the true data-generating model is $Y = 3X + \epsilon$, where $\epsilon$ has mean zero and variance $\sigma^2$, and $X$ is fixed (non-random), and also $Cov(\epsilon_i, \epsilon_{i^\prime})= 0$ for all $i \neq i^\prime$. What is the variance of the ridge estimator from (b)? How does the variance change as a function of $\lambda$?
+
+```{R}
+```
+
+## (g) In light of your answers to parts (d) and (f), argue that $\lambda$ in ridge regression allows us to control model complexity by trading off bias for variance.
+
+```{R}
+```

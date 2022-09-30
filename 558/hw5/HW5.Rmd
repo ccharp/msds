@@ -1,0 +1,334 @@
+---
+title: 'Homework #5'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Register an inline hook:
+knitr::knit_hooks$set(inline = function(x) {
+  x <- sprintf("%1.3f", x)
+  paste(x, collapse = ", ")
+})
+
+```
+
+```{r include=FALSE}
+rm(list=ls())
+
+pp <- function(...) {
+    print(paste0(...))
+}
+```
+
+## 1. In this problem, we will make use of the Auto data set, which is part of the ISLR2 package.
+```{R, include=FALSE}
+# Import packages and data-sets as needed
+library(ggplot2)
+library(dplyr)
+library(gsubfn)
+library(purrr)
+```
+## Instructions:
+You may discuss the homework problems in small groups, but you must write up the final solutions and code yourself. Please turn in your code for the problems that involve coding. However, code without written answers will receive no credit. To receive credit, you must explain your answers and show your work. All plots should be appropriately labeled and legible, with axis labels, legends, etc., as needed.
+
+_On this assignment, some of the problems involve random number generation. Be sure to set a random seed (using the command ${\tt set.seed()}$) before you begin._
+
+## 1. Suppose we have an $n \times p$ data matrix $X$, and a continuous-valued response $y \in \mathbb{R}^n$. We saw in lecture that the $m$th principal component score vector is a linear combination of the $p$ features, of the form $$z_{im} = \phi_{1m}x_{i1} + \phi_{2m}x_{i2} + ... + \phi_{pm}x_{ip} \protect\tag{1}$$ (e.g. see (12.2) and (12.4) in textbook). In principal components regression, we fit a linear model to predict $y$, but instead of using the columns of $X$ as predictors, we use the first $M$ principal component score vectors, where $M < p$.
+_A note before you begin: In this problem, I will ask you to “write out an expression for a linear model.” For instance, if I asked you to write out an expression for a linear model to predict an n-vector $y$ using the columns of an $n \times p$ matrix $X$, then here’s what I’d want to see: $y_i = \beta_0 + \beta_1x_{i1} + ... + \beta_px_{ip} + \epsilon_i$, where $\epsilon_i$ is a mean-zero noise term._
+
+![Problem 1](p1.png)
+
+\pagebreak
+
+## 2. We saw in class that $K$-means clustering minimizes the within-cluster sum of squares, given in (12.17) of the textbook. We can better understand the meaning of the within-cluster sum of squares by looking at (12.18) of the textbook. This shows us that the within-cluster sum of squares is (up to a scaling by a factor of two) the sum of squared distances from each observation to its cluster centroid.
+
+### (a) Show _computationally_ that (12.18) holds. You can do this by repeating this procedure a whole bunch of times:
+- Simulate an $n \times p$ data matrix, as well as some clusters $C_1, ... , C_K$. (It doesn’t matter whether there are any “true clusters” in your data, nor whether $C_1, ... , C_K$ correspond to these true clusters — (12.18) is a mathematical identity that should hold no matter what.)
+- Compute the left-hand side of (12.18) on this data.
+- Compute the right-hand side of (12.18) on this data.
+- Verify that the left- and right-hand sides are equal. (If they aren’t, then you have done something wrong!)
+
+```{R}
+n <- 1000
+p <- 100
+k <- 10
+c_size <- n/k
+
+X <- matrix(rnorm(n*p), ncol=p)
+
+left_sum <- 0
+right_sum <- 0
+
+for(i_start in seq(1, n, by=c_size)) { # move across the rows by partition size
+    i_end <- c_size + i_start - 1
+    
+    # left sum stuff
+    for(i_l in i_start:(i_end - 1)) { # left index
+        for(i_r in (i_l + 1):i_end) { # right index 
+            left_sum <- left_sum + sum((X[i_l,] - X[i_r,])^2) / c_size
+        }
+    }
+    
+    # right sum stuff
+    for(j in 1:p) { # partition-element index
+        x_bar <- mean(X[(i_start:i_end), j])
+        for(i in i_start:i_end) { # left index
+            # Note: we don't multiply this quantity by two because we single 
+            #       count each combination of i and i_prime above.
+            right_sum <- right_sum + ((X[i,j] - x_bar)^2) 
+        }
+    }
+}
+
+print(left_sum)
+print(right_sum)
+
+```
+
+### (b) _Extra Credit_: Show _analytically_ that (12.18) holds. In other words, use algebra to prove (12.18).
+
+
+\pagebreak
+
+## 3.  In this problem, you will generate simulated data, and then perform PCA and $K$-means clustering on the data.
+
+### (a) Generate a simulated data set with 20 observations in each of three classes (i.e. 60 observations total), and 50 variables.
+
+```{R}
+generate_q3_data <- function() {
+    gen_data <- function(color, mean, sd=1) {
+        colord <- rep(color, 20)
+        df <- data.frame(colord, rnorm(20, mean, sd))
+        
+        for(i in 2:50) {
+            df <- cbind(df, variable=rnorm(20, mean, sd))
+        }
+        return(df)
+    }
+    
+    rbind(
+       gen_data("red", 0, 0.75), 
+       gen_data("blue", 1.5, 1),
+       gen_data("green", 3, 1.25)
+    )
+}
+
+df <- generate_q3_data()
+```
+
+### (b) Perform PCA on the 60 observations and plot the first two principal component score vectors. Use a different color to indicate the observations in each of the three classes. If the three classes appear separated in this plot, then continue on to part (c). If not, then return to part (a) and modify the simulation so that there is greater separation between the three classes. Do not continue to part (c) until the three classes show at least some separation in the first two principal component score vectors.
+
+```{R}
+pcs <- prcomp(df[-1], scale=TRUE)
+
+df_pcs <- cbind(as.data.frame(pcs$x), color=df$colord)
+
+qplot(PC1, PC2, main="PCA", color=color, data=df_pcs) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue", "green"="green"))
+```
+
+### (c) Perform $K$-means clustering of the observations with $K$ = 3. How well do the clusters that you obtained in $K$-means clustering compare to the true class labels?
+_Hint: You can use the ${\tt table}$ function in ${\tt R}$ to compare the true class labels to the class labels obtained by clustering. Be careful how you interpret the results: $K$-means clustering will arbitrarily number the clusters, so you cannot simply check whether the true class labels and clustering labels are the same._  
+
+```{R}
+set.seed(1)
+km.out <- kmeans(df[-1], 3)
+
+qplot(PC1, PC2, main="k-means; k=3", color=color, shape=cluster, 
+      data=cbind(
+          df_pcs, 
+          cluster=factor(km.out$cluster))) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue",
+                                "green"="green"))
+```
+
+K-means performed perfectly. 
+
+### (d) Perform $K$-means clustering with $K$ = 2. Describe your results.
+
+```{R}
+set.seed(1)
+km.out <- kmeans(df[-1], 2)
+
+qplot(PC1, PC2, main="k-means; k=2", color=color, shape=cluster, 
+      data=cbind(
+          df_pcs, 
+          cluster=factor(km.out$cluster))) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue",
+                                "green"="green"))
+```
+The clustering algorithm absorbed the middle class, blue, into one of the outer clusters. The color that blue ultimated associated with depends on initial cluster assignments, which is random. 
+
+### (e) Now perform $K$-means clustering with $K$ = 4, and describe your results.
+
+```{R}
+set.seed(1)
+km.out <- kmeans(df[-1], 4)
+
+qplot(PC1, PC2, main="k-means; k=4", color=color, shape=cluster, 
+      data=cbind(
+          df_pcs, 
+          cluster=factor(km.out$cluster))) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue",
+                                "green"="green"))
+```
+Since the clustering algorithm must partition the data into 4 clusters, one of the three clusters is divided into two. The space between the original classes is large enough that k-means will not span cluster assignments across classes. 
+
+### (f) Now perform $K$-means clustering with $K$ = 3 on the first two principal component score vectors, rather than on the raw data. That is, perform $K$-means clustering on the 60 × 2 matrix of which the first column is the first principal component score vector, and the second column is the second principal component score vector. Comment on the results.
+
+```{R}
+set.seed(1)
+km.out <- kmeans(df_pcs[c(1,2)], 3)
+
+qplot(PC1, PC2, main="k-means; k=3; on PCA", color=color, shape=cluster, 
+      data=cbind(
+          df_pcs, 
+          cluster=factor(km.out$cluster))) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue",
+                                "green"="green"))
+```
+The results are the same. The original k-means 3 way colustering performed without error, so it's not surprising that applying it to the PCA-applied data, data that is more cleanly distinguished by class, did not cause regress. 
+
+### (g) Using the scale function, perform $K$-means clustering with $K$ = 3 on the data _after scaling each variable to have standard deviation one_. How do these results compare to those obtained in (b)? Explain
+
+```{R}
+# TODO: scale
+set.seed(1)
+scaled_xs <- scale(df[-1])
+km.out <- kmeans(scaled_xs, 3)
+
+qplot(PC1, PC2, main="k-means; k=3; scaled", color=color, shape=cluster, 
+      data=cbind(
+          df_pcs, 
+          cluster=factor(km.out$cluster))) + 
+    scale_color_manual(values=c("red"="red", 
+                                "blue"="blue",
+                                "green"="green"))
+```
+For this particular data, the results do not change. In the general case, scaling is important when continuous variables are represented at different orders of magnitude, especially for some notions of "distance", like euclidian distance, where the larger scaled variables would exert more influence on the distance. 
+
+\pagebreak
+
+## 4. This problem involves the ${\tt OJ}$ data set, which is part of the ${\tt ISLR2}$ package. 
+
+### (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+```{R}
+library(ISLR2)
+library(dplyr)
+
+splitData <- function(df, trainProportion) {
+    df <- df %>% mutate(id = row_number())
+    
+    set.seed(1)
+    train <- sample_frac(df, trainProportion)
+    test <- anti_join(df, train, by='id')
+    
+    df <- df %>% mutate(id=NULL)
+    
+    return(list(train=train, test=test))
+}
+
+split <- splitData(OJ, 800/nrow(OJ))
+```
+
+### (b) Fit a support vector classifier to the training data using ${\tt cost=0.01}$, with ${\tt Purchase}$ as the response and the other variables as predictors. Use the ${\tt summary()}$ function to produce summary statistics, and describe the results obtained.
+
+```{R}
+library(e1071)
+smodel <- svm(Purchase ~ ., data=split$train, cost=0.01, kernel="linear")
+summary(smodel)
+
+nrow(split$train)
+```
+Since cost is low, the margins will be very wide, most of the data will lie on or within the decision margin (about 75% of it in this case). Additionally, since we use a linear kernel (making the SVM a support vector classifier), the model is less flexible than it could be. 
+
+### (c) What are the training and test error rates?
+
+```{R}
+library(caret)
+preds_train <- predict(smodel, split$train)
+confusionMatrix(preds_train, split$train$Purchase)
+
+preds_test <- predict(smodel, split$test)
+confusionMatrix(preds_test, split$test$Purchase)
+```
+These results are better than I expected given the number of support vectors.
+
+### (d) Use the ${\tt tune()}$ function to select an optimal cost. Consider values in the range 0.01 to 10.
+
+```{R}
+set.seed(1)
+tsmodel <- tune(svm, Purchase ~ ., data=split$train, kernel="linear",
+                ranges = list(cost=c(0.01, 0.05, 0.1, 0.5, 1, 5, 10)) 
+                )
+
+summary(tsmodel)
+```
+Cost of 0.10 gave the best results on the training data. 
+
+### (e) Compute the training and test error rates using this new value for ${\tt cost}$.
+
+```{R}
+smodel <- svm(Purchase ~ ., data=split$train, cost=0.1, kernel="linear")
+
+preds_train <- predict(smodel, split$train)
+confusionMatrix(preds_train, split$train$Purchase)
+
+preds_test <- predict(smodel, split$test)
+confusionMatrix(preds_test, split$test$Purchase)
+```
+
+This seemed to slightly increase the generalizability of the model, since it performed better on the test data.
+
+### (f) Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use the default value for ${\tt gamma}$.
+```{R}
+set.seed(1)
+tsmodel <- tune(svm, Purchase ~ ., data=split$train, kernel="radial",
+                ranges = list(cost=c(0.01, 0.05, 0.1, 0.5, 1, 5, 10)) 
+                )
+
+summary(tsmodel)
+```
+
+```{R}
+smodel <- svm(Purchase ~ ., data=split$train, cost=0.5, kernel="radial")
+
+preds_train <- predict(smodel, split$train)
+confusionMatrix(preds_train, split$train$Purchase)
+
+preds_test <- predict(smodel, split$test)
+confusionMatrix(preds_test, split$test$Purchase)
+```
+This model performs very similarly but slight worse than the linear kernel model. We see higher accuracy on the training set and lower accuracy on the testing set, implying the model could be too flexible. 
+
+### (g) Repeat parts (b) through (e) using a support vector machine with a polynomial kernel. Set ${\tt degree=2}$.
+```{R}
+set.seed(1)
+tsmodel <- tune(svm, Purchase ~ ., data=split$train, kernel="polynomial", degree=2,
+                ranges = list(cost=c(0.01, 0.05, 0.1, 0.5, 1, 5, 10)) 
+                )
+
+summary(tsmodel)
+```
+
+```{R}
+smodel <- svm(Purchase ~ ., data=split$train, cost=0.5, kernel="polynomial", degre=2)
+
+preds_train <- predict(smodel, split$train)
+confusionMatrix(preds_train, split$train$Purchase)
+
+preds_test <- predict(smodel, split$test)
+confusionMatrix(preds_test, split$test$Purchase)
+```
+The polynomial kernel performed worse across the board.
+
+### (h) Overall, which approach seems to give the best results on this data?
+While all models performed comparably, the linear kernel seemed to provide the most balanced results! 
