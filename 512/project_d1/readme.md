@@ -1,6 +1,8 @@
 ### Goal
+The goal of this project is to understand the impact of mask mandate in Pierce County, WA. 
 
 ### Description
+This repository contains code to analyze the impace of mask mandate in Pierce County, WA. Data comes from the US government, NYT, and Kaggle. 
 
 ### Usage
 Acquire the data from the below references, move it to this repositories datat directory (`./data`), and run the notebook. Everything is reproducible given the raw data. 
@@ -19,3 +21,5 @@ For example, we only have CDC recommendation adherence (with respect to masking 
 Looking at the plot, we can see that the infection rate began to decline about a month after the mandate whent into effect. Ater about a month, it started to increase again. With the data we have, the best can do is note the correlation between the decreased infection rate (albeit delayed) and the mask policy. 
 
 Collaboration was useful, If nothing else, it gave me confidence to accept that my result was, at best, inconclusive. I did not use anyone's code. 
+
+![alt text](output.png)
