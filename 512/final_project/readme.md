@@ -2,7 +2,7 @@
 We aim to assess the overall efficacy of mask mandates across the United States and examine if efficacy is associated with political affiliation of a region.
 
 ### Description
-Initially, this repository contained only code to analyze the impace of mask mandate in Pierce County, WA. That research was expanded to include all counties in the United States. We additionally augmented the original datasets with county-level election results for the 2020 presidential election, which allowed us to approximate any given county's political lean (Democrat or Republican). We assess the overall efficacy of mask mandates across the entirety of the COVID-19 pandemic and if there is any relationship with political lean of a region. 
+Initially, this repository contained only code to analyze the impace of mask mandate in Pierce County, WA. That research was expanded to include all counties in the United States. We additionally augmented the original datasets with county-level election results for the 2020 presidential election, which allowed us to approximate any given county's political lean (Democrat or Republican). We assess the overall efficacy of mask mandates across the entirety of the COVID-19 pandemic and test if there is any relationship with political lean of a region. 
 
 Data comes from the US government, Harvard Databerse, and Johns Hopkins University via Kaggle. 
 
