@@ -1,8 +1,10 @@
 ### Goal
-The goal of this project is to understand the impact of mask mandate in Pierce County, WA. 
+We aim to assess the overall efficacy of mask mandates across the United States and examine if efficacy is associated with political affiliation of a region.
 
 ### Description
-This repository contains code to analyze the impace of mask mandate in Pierce County, WA. Data comes from the US government, NYT, and Kaggle. 
+Initially, this repository contained only code to analyze the impace of mask mandate in Pierce County, WA. That research was expanded to include all counties in the United States. We additionally augmented the original datasets with county-level election results for the 2020 presidential election, which allowed us to approximate any given county's political lean (Democrat or Republican). We assess the overall efficacy of mask mandates across the entirety of the COVID-19 pandemic and if there is any relationship with political lean of a region. 
+
+Data comes from the US government, Harvard Databerse, and Johns Hopkins University via Kaggle. 
 
 ### Usage
 Acquire the data from the below references, move it to this repositories datat directory (`./data`), and run the notebook. Everything is reproducible given the raw data. 
@@ -10,16 +12,8 @@ Acquire the data from the below references, move it to this repositories datat d
 ### Data
 Data is acquired from the following internet sources:
 * https://www.kaggle.com/datasets/antgoldbloom/covid19-data-from-john-hopkins-university
+  * For our purposes, contains county-level COVID-19 daily case counts
 * https://data.cdc.gov/Policy-Surveillance/U-S-State-and-Territorial-Public-Mask-Mandates-Fro/62d6-pm5i
-* https://github.com/nytimes/covid-19-data/tree/master/mask-use
-
-### Reflection
-The analysis was hamstrung by the available information. That is, out of all the afrorementioned sets of data, only a handfule of variables were applicable; this simply is not enough information to accuartely model the complexites of literal viral proliferation. We cannot proceed further without making major assumptions, for which we are unqualified. 
-
-For example, we only have CDC recommendation adherence (with respect to masking in public) estimates for a single point in time. How, then, can rigiously assess the impacts of a mask mandate without knowing how such a mandate impacts adherence? We can't, not without treading into potentially falacious territory. 
-
-Looking at the plot, we can see that the infection rate began to decline about a month after the mandate whent into effect. Ater about a month, it started to increase again. With the data we have, the best can do is note the correlation between the decreased infection rate (albeit delayed) and the mask policy. 
-
-Collaboration was useful, If nothing else, it gave me confidence to accept that my result was, at best, inconclusive. I did not use anyone's code. 
-
-![alt text](output.png)
+  * For our purposes, contains county-level details of mask mandates, including begin and end dates
+* https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/VOQCHQ 
+  * For our purposes, contains the number of votes recieved by each presidential candidate in the 2020 election at the county-level 
